@@ -1,0 +1,306 @@
+---
+title: "02-test-pca-w-unknowns"
+output: html_notebook
+---
+
+14 December 2022
+
+
+Testing individual-based analyses (pca) with unknown samples from AK.
+
+
+The haplotype file for the baseline samples comes from `10-complete-downsamp-self...`
+
+
+I'll read in the baseline data and the unknown data, then filter both appropriately (missing data), and try reformating the dataframe and then converting it to a genid object for adegenet.
+
+
+
+```{r setup}
+library(tidyverse)
+library(adegenet)
+library(ape)
+library(pegas)
+library(RColorBrewer)
+library(stringr)
+library(rubias)
+library(radiator)
+library(DescTools)
+library(factoextra)
+library(PNWColors)
+library(wesanderson)
+
+knitr::opts_knit$set(root.dir = '~/Desktop/RE_BS/stock review 2025 work/')
+
+```
+
+
+
+```{r load-data}
+# baseline data - curated, 997 indivs
+data <- read.csv('observed_unfiltered_haplotype.csv')
+```
+
+```{r}
+# slim that down for the pca
+baseline_for_combo <- data %>%
+  select(indiv.ID, locus, rank, haplo)
+
+colnames(baseline_for_combo) <- c('id','locus','rank','haplo')
+
+baseline_for_combo 
+```
+
+
+
+### Toss out indivs with that were also removed from rubias
+```{r toss-missers}
+
+tossers <- read.csv("rockfish-species-id/removed_samples_rubias_01_16_25.csv")
+
+baseline_for_combo <- baseline_for_combo %>%
+  subset(!id %in% tossers$id)
+```
+
+In the meantime, let's move forward with the analysis.
+
+```{r}
+# first make integers of the alleles
+alle_idxs <- baseline_for_combo %>% 
+  dplyr::select(id, locus, rank, haplo) %>%
+  group_by(locus) %>%
+  mutate(alleidx = as.integer(factor(haplo, levels = unique(haplo)))) %>%
+  ungroup() %>%
+  arrange(id, locus, alleidx) # rubias can handle NA's, so no need to change them to 0's
+
+# select just the columns to retain 
+#alle_idx2 <- alle_idxs[,-7]
+  
+# and spread the alleles
+two_col <- alle_idxs %>%
+  #group_by(indiv, locus) %>%
+  unite(loc, locus, rank, sep = ".") %>%
+  #ungroup() %>%
+  select(-haplo) %>%
+  pivot_wider(names_from = loc, values_from = alleidx) 
+  
+```
+
+Add the species info back on
+```{r}
+spp_indiv <- read.csv('species_ID.csv')
+colnames(spp_indiv) <- c('id','species', 'state', 'voucher')
+
+```
+
+### PCA
+
+
+```{r}
+# create vectors of indivs and species
+spp_labels <- spp_indiv$species
+indivs <- spp_indiv$id
+
+```
+
+
+```{r}
+# make factor?
+spp_indiv$species <- factor(spp_indiv$species)
+```
+
+
+Make the df match the requirements for tidy_genomic_data
+```{r}
+long_df <- alle_idxs %>%
+  select(-haplo, -rank) %>%
+  left_join(., spp_indiv) %>%
+  select(species, everything()) %>%
+  rename(INDIVIDUALS = id, STRATA = species, MARKERS = locus, GT = alleidx)
+
+```
+
+Genotypes should be coded with 3 integers for each alleles. 6 integers in total for the genotypes. e.g. 001002 or 111333 (for heterozygote individual). 6 integers WITH separator: e.g. 001/002 or 111/333 (for heterozygote individual). The separator can be any of these: "/", ":", "_", "-", ".", and will be removed.
+
+
+```{r}
+library("DescTools")
+
+# create 3 digit integers from the genotypes
+long_df$GT3 <- Format(long_df$GT, ldigits = 3, digits = 0)
+
+head(long_df)
+
+# NAs hold
+# long_df %>%
+#   filter(is.na(GT3))
+
+# fix NAs
+long_df0s <- long_df %>%
+  mutate(GT3 = ifelse(is.na(GT3), "000", GT3))
+```
+
+Now combine the GT3 column per indiv/marker:
+
+```{r}
+# make the genos characters and then try pasting them as strings
+long_df0s$GT3 <- as.character(long_df0s$GT3)
+
+long_df3digit <- long_df0s %>%
+  group_by(INDIVIDUALS, MARKERS) %>% 
+  arrange(GT3, .by_group = TRUE) %>% 
+  summarise(GENOTYPE = toString(GT3))
+  
+# paste strings together
+long_df3digit$GENOTYPE <- gsub(", ","",long_df3digit$GENOTYPE)
+
+
+# add back on species identity as strata
+df_for_conversion <- long_df0s %>% 
+  select(-GT, -GT3) %>%
+  left_join(., long_df3digit) %>%
+  unique() %>%
+  rename(GT = GENOTYPE) %>%
+  mutate(GT = ifelse(GT == "000000", NA, GT))
+
+df_for_conversion$STRATA <- as.factor(df_for_conversion$STRATA)
+
+# check on NAs here
+df_for_conversion
+```
+
+
+
+
+```{r convert-df-to-genind}
+# use the radiator package for this conversion
+genind_df <- write_genind(df_for_conversion)
+```
+
+
+
+Now that the data is a genind object, go ahead and run the PCA.
+
+Make PCA
+```{r dataset-pca, echo=FALSE}
+# Allele presence absence data are extracted and NAs replaced using tab:
+datasetX <- tab(genind_df, NA.method="mean") # double check that is this the appropriate method.
+
+# make PCA
+dataset_pca1 <- dudi.pca(datasetX, center = TRUE, scannf = FALSE, scale=FALSE, nf = 10)
+
+#dataset_pca1$eig
+
+# colors
+mycol <- c("palegreen", "darkorange", "slateblue","darkolivegreen","orange", "purple4")
+
+# plot with factor labels
+pdf("DIANA_SNPS_pca_01_16_25.pdf", width = 10, height = 10)
+s.class(dataset_pca1$li, fac=pop(genind_df), wt = rep(1, length(pop(genind_df))), clabel = .8, grid = FALSE, cellipse = 2,
+        xax=1, yax=2, col=transp(mycol,.8),
+        axesel=FALSE, cstar=0, cpoint=1)
+s.class(dataset_pca1$li, fac=pop(genind_df), wt = rep(1, length(pop(genind_df))), clabel = .8, grid = FALSE, cellipse = 2,
+        xax=1, yax=2, col=transp(mycol,.8),
+        axesel=FALSE, cstar=0, cpoint=1)
+dev.off()
+
+othercols <- wes_palette(name = "GrandBudapest1", n = 4, type = 'discrete')
+species_cols <- pnw_palette(name = 'Bay', n = 2, type = 'discrete')
+PCA_df <- dataset_pca1$li
+
+df <- tibble::rownames_to_column(PCA_df, "id")
+PCA_df_w_labels <- merge(df, spp_indiv, by = 'id')
+pca_info <- get_eigenvalue(dataset_pca1)
+
+(pca_VMSURF3 <- ggplot(data = (subset(PCA_df_w_labels, state != '')), aes(x = Axis1, y = Axis2, color = state)) +
+  geom_point(size = 2.5, alpha = 0.8) +
+  xlab(paste("Axis 1 (", round(pca_info$variance.percent[[1]], 3), "%)", sep = "")) +
+  ylab(paste("Axis 2 (", round(pca_info$variance.percent[[2]], 3), "%)", sep = "")) +
+  ggtitle('all samples')+
+  scale_color_manual(values = othercols)+
+  theme_bw())
+  
+ggplot(data = (PCA_df_w_labels), aes(x = Axis1, y = Axis2)) +
+  geom_point(size = 2, alpha = 0.8) +
+  xlab(paste("Axis 1 (", round(pca_info$variance.percent[[1]], 3), "%)", sep = "")) +
+  ylab(paste("Axis 2 (", round(pca_info$variance.percent[[2]], 3), "%)", sep = "")) +
+  theme_bw()
+
+(pca_VMSURF3_known <- ggplot(data = (subset(PCA_df_w_labels, species != 'N/A')), aes(x = Axis1, y = Axis2, color = species, shape = voucher)) +
+  geom_point(size = 2.5, alpha = 0.6) +
+  xlab(paste("Axis 1 (", round(pca_info$variance.percent[[1]], 3), "%)", sep = "")) +
+  ylab(paste("Axis 2 (", round(pca_info$variance.percent[[2]], 3), "%)", sep = "")) +
+  ggtitle('validated samples')+
+  scale_color_manual(values = species_cols)+
+  theme_bw())
+
+
+pdf("DIANA_SNPS_pca_v2_01_16_25.pdf", width = 10, height = 10)
+pca_VMSURF3_known
+pca_VMSURF3
+dev.off()
+  
+```
+
+
+```{r fst}
+library(hierfstat)
+pal_species <- c('melanostictus male' = "#A6CEE3",
+                 'melanostictus female' = "#1F78B4",
+                 'aleutianus male' = "#B2DF8A",
+                 'aleutianus female' = "#33A02C",
+                 'melanostictus' = "#1F78B4",
+                 'aleutianus' = "#33A02C")
+
+rubias_calls <-read.csv(file = '~/Desktop/RE_BS/stock review 2025 work/rockfish-species-id/rubias_output_01_16_2025.csv') %>%
+  select(c(indiv, repunit))
+
+colnames(rubias_calls) <- c('INDIVIDUALS','pop')
+rubias_calls$INDIVIDUALS <- gsub('gtseq3_', '', rubias_calls$INDIVIDUALS)
+
+df_for_conversion2 <- merge(df_for_conversion, rubias_calls) %>% select(-c('STRATA'))
+names(df_for_conversion2)[names(df_for_conversion2) == 'pop'] <- 'STRATA'
+
+genind_df <- write_genind(df_for_conversion2)
+
+
+genet.dist(genind_df, diploid = TRUE, method = "WC84") %>% round(digits = 3)
+
+
+
+# Allele presence absence data are extracted and NAs replaced using tab:
+datasetX <- tab(genind_df, NA.method="mean") # double check that is this the appropriate method.
+
+# make PCA
+dataset_pca1 <- dudi.pca(datasetX, center = TRUE, scannf = FALSE, scale=FALSE, nf = 10)
+PCA_df <- dataset_pca1$li
+
+df <- tibble::rownames_to_column(PCA_df, "id")
+PCA_df_w_labels <- merge(df, rubias_calls, by.x = 'id', by.y = 'INDIVIDUALS')
+pca_info <- get_eigenvalue(dataset_pca1)
+
+pca
+
+PCA <- ggplot(data = (PCA_df_w_labels), aes(x = Axis1, y = Axis2, color = pop)) +
+  geom_point(size = 2, alpha = 0.8) +
+  xlab(paste("Axis 1 (", round(pca_info$variance.percent[[1]], 3), "%)", sep = "")) +
+  ylab(paste("Axis 2 (", round(pca_info$variance.percent[[2]], 3), "%)", sep = "")) +
+  theme_bw() +
+  scale_color_manual(values = pal_species, name = "Rubias Species ID") +
+  theme(legend.position = 'bottom')
+
+
+ggsave(file =  "~/Desktop/RE_BS/stock review 2025 work/figures/PCA_w_rubias_call.jpeg",
+       width = 130,
+       height = 90,
+       units = c("mm"),
+       dpi = 300)
+PCA
+dev.off()
+
+```
+
+
+
+
+

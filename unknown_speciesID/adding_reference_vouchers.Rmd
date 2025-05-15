@@ -1,0 +1,317 @@
+---
+title: "adding_vouchers_to_diana_reference"
+author: "Anita Wray"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{r setup}
+knitr::opts_knit$set(root.dir = "~/Desktop/RE_BS/stock review 2025 work/")
+```
+
+```{r read in vouchers}
+library(tidyverse)
+library(readxl)
+library(stringr)
+library(lubridate)
+library(rubias)
+library(ggpattern)
+library(forcats)
+
+source("R/rockfish-funcs2.R")
+setwd("~/Desktop/RE_BS/stock review 2025 work/")
+# get the names of the files
+fdf <- read.table("rds-file-list.txt", stringsAsFactors = FALSE, header = TRUE) %>%
+  tibble::as_tibble()
+
+dir <- "microhaplot/"
+
+
+
+# cycle over them, read them and add the gtseq_run column on each.
+# at the end, bind them together.
+genos_long <- lapply(1:nrow(fdf), function(i) {
+  message("Working on ", fdf$file[i])
+  call_genos_from_haplotRDS(path = file.path(dir, fdf$file[i])) %>%
+    mutate(gtseq_run = fdf$gtseq_run[i]) %>%
+    select(gtseq_run, everything())
+}) %>%
+  bind_rows()
+
+#genos_long$id <- gsub('-','',genos_long$id)
+
+
+
+#### In the end, let us get a data frame that includes genotypes for all the individuals  ####
+# and which explicitly has NAs in places where data are missing, and also 
+# has the NMFS_DNA_ID on there
+genos_long_explicit_NAs <- genos_long %>%
+  select(gtseq_run, id) %>%
+  unique() %>%
+  unite(col = gid, sep = "_", gtseq_run, id) %>%
+  select(gid) %>%
+  unlist() %>%
+  unname() %>%
+  expand.grid(gid = ., locus = unique(genos_long$locus), gene_copy = 1:2, stringsAsFactors = FALSE) %>%
+  tibble::as_tibble() %>% 
+  separate(gid, into = c("gtseq_run", "id"), convert = TRUE, sep = '_') %>%
+  left_join(., genos_long) %>%
+  arrange(gtseq_run, id, locus, gene_copy)
+
+genos_long_explicit_NAs_vouchers <- genos_long_explicit_NAs %>%
+  subset(id %in% c("LENTIGINOSUS-UW159878","HELVOMACULATUS-UW157086", "SIMULATOR-UW159881",
+                   "SIMULATOR-UW159882", "HELVOMACULATUS-UW157087",'MACDONALDI-UW202823',
+                   'VARIEGATUS-UW159883','MACDONALDI-UW202928','BREVISPINIS-UW157098',
+                   'LENTIGINOSUS-UW159879', 'GILLI-UW202792',
+                  'MACDONALDI-UW202916', 'GILLI-UW202913',
+                   'LENTIGINOSUS-UW202941',  'MACDONALDI-UW202824',
+                   'GILLI-UW202915','HELVOMACULATUS-UW114035',
+                   'GILLI-UW202802', 'MACDONALDI-UW202914',
+                   'LENTIGINOSUS-UW202931',  'EOS-UW114068',
+                   'HELVOMACULATUS-UW119876', 'HELVOMACULATUS-UW119874',
+                   'SIMULATOR-UW114049','BREVISPINIS-UW119935',
+                   'MACDONALDI-UW114065', 'HELVOMACULATUS-UW151755',
+                   'BREVISPINIS-UW114059','LENTIGINOSUS-UW152312',
+                   'ROSENBLATTI-UW152188','ROSENBLATTI-UW152338',
+                   'ROSENBLATTI-UW152343', 'LENTIGINOSUS-UW152333',
+                   'BREVISPINIS-UW153444','BREVISPINIS-UW153443')) %>%
+  subset(id != 'HELVOMACULATUS-UW151755') %>% #this one is mislabeled 
+  subset(id != 'BREVISPINIS-UW114059') #and this one is too
+
+genos_long_explicit_NAs_vouchers$species <- str_extract(genos_long_explicit_NAs_vouchers$id, "[^-]+")
+```
+
+
+```{r add sunset}
+
+fdf <- read.table("rds-file-list.txt", stringsAsFactors = FALSE, header = TRUE) %>%
+  tibble::as_tibble()
+
+dir <- "~/Desktop/VermilionRF/microhaplotyping/VMSURF_microhaps/microhaplot/"
+
+
+
+# cycle over them, read them and add the gtseq_run column on each.
+# at the end, bind them together.
+genos_long_sunset <- lapply(1:nrow(fdf), function(i) {
+  message("Working on ", fdf$file[i])
+  call_genos_from_haplotRDS(path = file.path(dir, fdf$file[i])) %>%
+    mutate(gtseq_run = fdf$gtseq_run[i]) %>%
+    select(gtseq_run, everything())
+}) %>%
+  bind_rows()
+
+#Pull out two known sunset individual
+croc_known <- c('H-14-MI-V0272', 'H-14-MI-V0191', 'H-14-MI-V0262', 'H-14-MI-V0250', 'H-14-MI-V0264', 'H-14-MI-V0281')
+
+croc <- subset(genos_long_sunset, genos_long_sunset$id %in% croc_known)
+
+croc_NAs <- croc %>%
+  select(gtseq_run, id) %>%
+  unique() %>%
+  unite(col = gid, sep = "_", gtseq_run, id) %>%
+  select(gid) %>%
+  unlist() %>%
+  unname() %>%
+  expand.grid(gid = ., locus = unique(croc$locus), gene_copy = 1:2, stringsAsFactors = FALSE) %>%
+  tibble::as_tibble() %>% 
+  separate(gid, into = c("gtseq_run", "id"), convert = TRUE, sep = '_') %>%
+  left_join(., croc) %>%
+  arrange(gtseq_run, id, locus, gene_copy)
+
+croc_NAs$species <- 'crocotulus'
+
+
+genos_long_explicit_NAs_vouchers <- rbind(genos_long_explicit_NAs_vouchers, croc_NAs)
+
+
+```
+
+
+
+```{r take-just-one}
+# slow-ish function to get the total read depth column
+tdepth <- function(a, d) {
+  if(any(is.na(a))) {
+    return(NA)
+  }
+  if(a[1]==a[2]) {
+    return(d[1])
+  } else {
+    return(d[1] + d[2])
+  }
+  
+}
+# this takes the highest read-depth instance of each duplicately-genotyped individual.
+geno_one_each <- genos_long_explicit_NAs_vouchers %>%
+  group_by(id, species, locus, gtseq_run) %>%
+  mutate(total_depth = tdepth(allele, depth)) %>%
+  ungroup() %>%
+  arrange(id, species, locus, total_depth, gtseq_run, depth) %>%
+  group_by(id, species, locus) %>%
+  mutate(rank = 1:n()) %>% 
+  #ungroup() %>%
+  filter(rank <= 2)
+```
+
+
+```{r remove-loci}
+# read in a list of the 6 loci
+to_remove <- read_csv("data/loci_to_remove.csv", show_col_types = FALSE)
+
+# only keep the loci that are not those 6
+keepers <- geno_one_each %>%
+  anti_join(., to_remove, by = "locus")
+
+# that should leave 90 loci  
+
+length(unique(geno_one_each$locus)). #looks like this isn't neccessary but maybe good to keep just incase
+```
+
+### Toss out indivs with missing data at more than 25 loci
+Now, toss out any individual with fewer than 65 non-missing loci
+```{r toss-missers}
+no_hi_missers <- keepers %>% 
+  group_by(id, gtseq_run) %>%
+  filter(sum(!is.na(allele)) >= (65*2))
+
+unique(keepers$id)[which(!unique(keepers$id) %in% unique(no_hi_missers$id))] #which ones are dropped?
+```
+
+
+
+
+Load baseline data
+```{r baseline-data}
+# baseline data - curated, 997 indivs
+baseline <- readRDS("new_baseline_data/processed/sebastes_spp_id_baseline_haplotypes.rds")
+
+# remove the 6 loci that had HWE and other issues
+to_remove <- read_csv("data/loci_to_remove.csv")
+
+baseline90 <- baseline %>%
+  anti_join(., to_remove)
+
+# add reference column to prepare data for rubias
+dataset <- no_hi_missers %>%
+  mutate(sample_type = "reference") %>%
+  rename(collection = species) %>%
+  rename(indiv = id) %>%
+  mutate(repunit = collection) %>%
+  ungroup() %>%
+  mutate(id = indiv) %>%
+  mutate(species = collection) %>%
+  select(colnames(baseline90)) # reorder the columns
+
+dataset %>%
+  group_by(indiv) %>%
+  tally() %>%
+  arrange(desc(n))
+
+new_baseline <- rbind(dataset, baseline90)
+
+
+tossers <- new_baseline %>%
+  select(indiv, gtseq_run, id) %>%
+  unique() %>%
+  group_by(indiv) %>%
+  tally() %>%
+  filter(n >1)
+
+baseline90_one_each <- new_baseline %>%
+  anti_join(., tossers) %>%
+  select(-c('rank', 'total_depth'))
+
+# baseline data - curated, 1028 indivs
+baseline_spp_info <- baseline90_one_each %>%
+  select(sample_type, repunit, collection, indiv, gtseq_run, id, species) %>%
+  unique()
+baseline_spp_info$gtseq_run <- as.character(baseline_spp_info$gtseq_run)
+```
+
+```{r baseline-format}
+# slim that down to just the matching field with the unknowns
+for_alleidx <- baseline90_one_each %>%
+  select(-indiv, -c(1:3), -species)
+
+for_alleidx$gtseq_run <- as.character(for_alleidx$gtseq_run)
+```
+
+
+
+```{r}
+# merge the two dataframes
+merged_df <- for_alleidx
+
+# first make integers of the alleles
+alle_idxs <- merged_df %>% 
+  dplyr::select(gtseq_run, id, locus, gene_copy, allele) %>%
+  group_by(locus) %>%
+  mutate(alleidx = as.integer(factor(allele, levels = unique(allele)))) %>%
+  ungroup() %>%
+  arrange(gtseq_run, id, locus, alleidx) # rubias can handle NA's, so no need to change them to 0's
+
+  
+# and spread the alleles
+two_col <- alle_idxs %>%
+  #group_by(indiv, locus) %>%
+  unite(loc, locus, gene_copy, sep = ".") %>%
+  #ungroup() %>%
+  select(-allele) %>%
+  pivot_wider(names_from = loc, values_from = alleidx) 
+
+
+```
+
+
+
+add back on info for reference and make two-column format for rubias
+```{r}
+# baseline
+reference <- two_col %>%
+  left_join(., baseline_spp_info) %>%
+  filter(!is.na(species)) %>%
+  select(-gtseq_run, -id, -species) %>%
+  select(sample_type, repunit, collection, indiv, everything())
+
+```
+
+
+```{r run-rubias}
+# Now that the data are in the corret format, load Rubias
+library(rubias)
+
+# perform self-assignment of reference samples
+ref_self <- self_assign(reference, gen_start_col = 5)
+
+# and take a quick look at those assignments
+good <- ref_self %>%
+  filter(inferred_repunit == repunit) %>%
+  filter(scaled_likelihood > 0.95)
+```
+
+
+```{r}
+mistakes <- ref_self %>%
+  filter(inferred_repunit != repunit) %>%
+  filter(scaled_likelihood > 0.80) %>%
+  select(indiv, collection, inferred_collection, scaled_likelihood, z_score)
+
+```
+
+
+## other assignments
+```{r other-assignments}
+# between 50-95% likelihood
+ref_self %>%
+  filter(inferred_repunit != repunit) %>%
+  filter(scaled_likelihood > 0.5 & scaled_likelihood < 0.95) %>%
+  arrange(desc(scaled_likelihood))
+```
+All 25 of the mis-assignments between 50-95% likelihood are gopher/black-and-yellow.
+
+
+```{r}
+
+saveRDS(new_baseline %>% subset(!indiv %in% mistakes$indiv), "new_baseline_data/processed/sebastes_spp_id_baseline_haplotypes_04_17.rds")
+
+```

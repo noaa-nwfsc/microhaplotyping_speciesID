@@ -1,0 +1,197 @@
+---
+title: "pca_species_specific"
+output: html_document
+date: "2023-07-12"
+---
+---
+title: "02-test-pca-w-unknowns"
+output: html_notebook
+---
+
+14 December 2022
+
+
+Testing individual-based analyses (pca) with unknown samples from AK.
+
+
+The haplotype file for the baseline samples comes from `10-complete-downsamp-self...`
+
+
+I'll read in the baseline data and the unknown data, then filter both appropriately (missing data), and try reformating the dataframe and then converting it to a genid object for adegenet.
+
+
+
+```{r setup}
+library(tidyverse)
+library(adegenet)
+library(ape)
+library(pegas)
+library(RColorBrewer)
+library(stringr)
+library(rubias)
+library(radiator)
+library(DescTools)
+
+knitr::opts_knit$set(root.dir = '~/Desktop/VermilionRF/microhaplotyping/')
+
+```
+
+
+
+```{r load-data}
+# baseline data - curated, 997 indivs
+data <- read.csv('./VMSURF_microhaps/haplotypes_for_pca_SUONLY.csv')
+```
+
+```{r}
+# slim that down for the pca
+baseline_for_combo <- data %>%
+  select(id, locus, rank, haplo)
+
+baseline_for_combo 
+```
+
+
+
+### Toss out indivs with missing data at more than 25 loci
+Now, toss out any individual with fewer than 65 non-missing loci
+```{r toss-missers}
+no_hi_missers <- baseline_for_combo %>% 
+  group_by(id) %>%
+  filter(sum(!is.na(haplo)) >= (65*2))
+
+
+# samples that were tossed?
+baseline_for_combo %>% 
+  group_by(id) %>%
+  filter(sum(is.na(haplo)) >= (65*2)) %>%
+  select(id) %>%
+  unique()
+
+
+
+# distribution of missing data?
+baseline_for_combo %>%
+  group_by(id) %>%
+  filter(is.na(haplo)) %>%
+  tally()
+```
+
+In the meantime, let's move forward with the analysis.
+
+```{r}
+# first make integers of the alleles
+alle_idxs <- baseline_for_combo %>% 
+  dplyr::select(id, locus, rank, haplo) %>%
+  group_by(locus) %>%
+  mutate(alleidx = as.integer(factor(haplo, levels = unique(haplo)))) %>%
+  ungroup() %>%
+  arrange(id, locus, alleidx) # rubias can handle NA's, so no need to change them to 0's
+
+# select just the columns to retain 
+#alle_idx2 <- alle_idxs[,-7]
+  
+# and spread the alleles
+two_col <- alle_idxs %>%
+  #group_by(indiv, locus) %>%
+  unite(loc, locus, rank, sep = ".") %>%
+  #ungroup() %>%
+  select(-haplo) %>%
+  pivot_wider(names_from = loc, values_from = alleidx) 
+  
+```
+
+### PCA
+
+Make the df match the requirements for tidy_genomic_data
+```{r}
+long_df <- alle_idxs %>%
+  select(-haplo, -rank) %>%
+  rename(INDIVIDUALS = id, MARKERS = locus, GT = alleidx)
+
+```
+
+Genotypes should be coded with 3 integers for each alleles. 6 integers in total for the genotypes. e.g. 001002 or 111333 (for heterozygote individual). 6 integers WITH separator: e.g. 001/002 or 111/333 (for heterozygote individual). The separator can be any of these: "/", ":", "_", "-", ".", and will be removed.
+
+
+```{r}
+library("DescTools")
+
+# create 3 digit integers from the genotypes
+long_df$GT3 <- Format(long_df$GT, ldigits = 3, digits = 0)
+
+head(long_df)
+
+# NAs hold
+# long_df %>%
+#   filter(is.na(GT3))
+
+# fix NAs
+long_df0s <- long_df %>%
+  mutate(GT3 = ifelse(is.na(GT3), "000", GT3))
+```
+
+Now combine the GT3 column per indiv/marker:
+
+```{r}
+# make the genos characters and then try pasting them as strings
+long_df0s$GT3 <- as.character(long_df0s$GT3)
+
+long_df3digit <- long_df0s %>%
+  group_by(INDIVIDUALS, MARKERS) %>% 
+  arrange(GT3, .by_group = TRUE) %>% 
+  summarise(GENOTYPE = toString(GT3))
+  
+# paste strings together
+long_df3digit$GENOTYPE <- gsub(", ","",long_df3digit$GENOTYPE)
+
+
+# add back on species identity as strata
+df_for_conversion <- long_df0s %>% 
+  select(-GT, -GT3) %>%
+  left_join(., long_df3digit) %>%
+  unique() %>%
+  rename(GT = GENOTYPE) %>%
+  mutate(GT = ifelse(GT == "000000", NA, GT))
+
+df_for_conversion$STRATA <- NA
+
+# check on NAs here
+df_for_conversion
+```
+
+
+
+
+```{r convert-df-to-genind}
+# use the radiator package for this conversion
+genind_df <- write_genind(df_for_conversion)
+```
+
+
+
+Now that the data is a genind object, go ahead and run the PCA.
+
+Make PCA
+```{r dataset-pca}
+# Allele presence absence data are extracted and NAs replaced using tab:
+datasetX <- tab(genind_df, NA.method="mean") # double check that is this the appropriate method.
+
+# make PCA
+dataset_pca1 <- dudi.pca(datasetX, center = TRUE, scannf = FALSE, scale=FALSE, nf = 10)
+
+dataset_pca1$eig
+
+# colors
+mycol <- c("palegreen", "darkorange", "slateblue","darkolivegreen","orange", "purple4")
+
+# plot with factor labels
+pdf("diana_pca.pdf", width = 10, height = 10)
+s.class(dataset_pca1$li, fac=pop(genind_df), wt = rep(1, length(pop(genind_df))), clabel = .8, grid = FALSE, cellipse = 2,
+        xax=1, yax=2, col=transp(mycol,.8),
+        axesel=FALSE, cstar=0, cpoint=1)
+s.class(dataset_pca1$li, fac=pop(genind_df), wt = rep(1, length(pop(genind_df))), clabel = .8, grid = FALSE, cellipse = 2,
+        xax=1, yax=2, col=transp(mycol,.8),
+        axesel=FALSE, cstar=0, cpoint=1)
+dev.off()
+```
