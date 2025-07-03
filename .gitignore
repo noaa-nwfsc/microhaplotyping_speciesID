@@ -47,3 +47,11 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+
+##fastq files 
+s00*
+*.fastq
+*.fq
+*.gz
+*.vcf

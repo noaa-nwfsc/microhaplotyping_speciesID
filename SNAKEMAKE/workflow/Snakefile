@@ -1,0 +1,40 @@
+
+include: "rules/common.smk"
+
+
+##### Target Rules #####
+
+rule all:
+	input:
+		requested_outputs_from_units_and_config("idxstats", "ordered-read-counts-table.csv"),
+		requested_outputs_from_units_and_config("idxstats", "read-counts-heatmap.pdf"),
+		requested_outputs_from_units_and_config("idxstats", "read-counts-samples.pdf"),
+		requested_outputs_from_units_and_config("idxstats", "read-counts-markers.pdf"),
+		requested_vcfs_from_units_and_config(),
+		requested_microhap_outputs_from_units_and_config()
+
+
+##### Modules #####
+
+include: "rules/download_and_index_genomes.smk"
+include: "rules/create_bedfiles_and_thinned_genomes.smk"
+include: "rules/trimming.smk"
+include: "rules/flash.smk"
+include: "rules/map_and_extract.smk"
+include: "rules/variant_calling.smk"
+include: "rules/microhaplot.smk"
+include: "rules/multi_dir_variant_calling.smk"
+include: "rules/idxstats.smk"
+
+
+
+#include: "rules/map_and_extract.smk"
+#include: "rules/coverages.smk"
+#include: "rules/starts_and_cigars.smk"
+
+
+
+
+
+
+

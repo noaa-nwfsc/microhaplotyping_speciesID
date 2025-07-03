@@ -1,0 +1,15 @@
+$schema: "http://json-schema.org/draft-04/schema#"
+description: row of the units.csv file that includes NMFS_DNA_ID and the markers set
+type: object
+properties:
+  sample:
+    type: string
+    description: the short sample name that goes into file names
+  Markers:
+    type: string
+    description: a single one (possibly of several) of the marker sets this individual was typed at.
+  
+required:
+  - sample
+  - Markers
+
