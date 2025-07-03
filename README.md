@@ -1,12 +1,12 @@
 # Rockfish Species ID via microhaplotyping
  
 Primary Contacts: Anita Wray,
-[anita.wray\@noaa.gov](mailto:anita.wray@noaa.gov)
+[anita.wray\@noaa.gov](mailto:anita.wray@noaa.gov), Krista Nichols [krista.nichols\@noaa.gov](mailto:krista.nichols@noaa.gov)
 
 ## Objective:
 This project achieved two objectives:
-1. Find a sequencing panel to successfully ID rougheye from blackspotted rockfish
-2. Test additional cryptic species complexes on existing sequencing panels
+1. Find a sequencing panel to successfully ID rougheye from blackspotted rockfish for the 2025 stock assessment
+2. Test additional cryptic species complexes on existing sequencing panels.
 This repo doesn't include the other panels tested, but we were able to conclude that Diana's GTseq microhaplotyping panel works well. 
 
 ## Methods:
@@ -22,11 +22,11 @@ Use Rubias to test if known vouchered specimens can be identified to species usi
 
 #### 3. Run unknown samples
 
-Use Rubias to ID unknown samples (primarily rougheye/blackspotted, but see below for all the species that are in this panel). 
+Use Rubias to ID unknown samples. For reference, here are the species that we know can be identified using this panel.
 
-<img src="https://github.com/anitawray-NOAA/microhaplotyping_speciesID/blob/main/Screenshot%202025-07-03%20at%2012.41.58%20PM.png" width="100">
+<img src="https://github.com/anitawray-NOAA/microhaplotyping_speciesID/blob/main/Screenshot%202025-07-03%20at%2012.41.58%20PM.png" width="400">
 
-Also run a PCA (see below)
+Also run a PCA:
 ![PCA](https://github.com/anitawray-NOAA/microhaplotyping_speciesID/blob/main/Screenshot%202025-07-03%20at%2012.45.40%20PM.png)
 
 ## Disclaimer:
