@@ -22,7 +22,11 @@ Use Rubias to test if known vouchered specimens can be identified to species usi
 
 #### 3. Run unknown samples
 
-Use Rubias to ID unknown samples (primarily rougheye/blackspotted, but see below for all the species that are in this panel). Also run a PCA (see below)
+Use Rubias to ID unknown samples (primarily rougheye/blackspotted, but see below for all the species that are in this panel). 
+!(https://github.com/anitawray-NOAA/microhaplotyping_speciesID/blob/main/Screenshot%202025-07-03%20at%2012.41.58%20PM.png)
+
+Also run a PCA (see below)
+!(https://github.com/anitawray-NOAA/microhaplotyping_speciesID/blob/main/Screenshot%202025-07-03%20at%2012.45.40%20PM.png)
 
 ## Disclaimer:
 
