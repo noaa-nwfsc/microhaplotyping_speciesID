@@ -2,13 +2,15 @@
 title: "adding_vouchers_to_diana_reference"
 author: "Anita Wray"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 ```{r setup}
 knitr::opts_knit$set(root.dir = "~/Desktop/RE_BS/stock review 2025 work/")
 ```
 
-```{r read in vouchers}
+```{r libraries, include=FALSE}
 library(tidyverse)
 library(readxl)
 library(stringr)
@@ -16,7 +18,9 @@ library(lubridate)
 library(rubias)
 library(ggpattern)
 library(forcats)
+```
 
+```{r read in vouchers, warning=FALSE}
 source("R/rockfish-funcs2.R")
 setwd("~/Desktop/RE_BS/stock review 2025 work/")
 # get the names of the files
@@ -164,7 +168,7 @@ keepers <- geno_one_each %>%
 
 # that should leave 90 loci  
 
-length(unique(geno_one_each$locus)). #looks like this isn't neccessary but maybe good to keep just incase
+length(unique(geno_one_each$locus)) #looks like this isn't neccessary but maybe good to keep just incase
 ```
 
 ### Toss out indivs with missing data at more than 25 loci
@@ -287,6 +291,13 @@ ref_self <- self_assign(reference, gen_start_col = 5)
 good <- ref_self %>%
   filter(inferred_repunit == repunit) %>%
   filter(scaled_likelihood > 0.95)
+
+
+# look at the added vouchers 
+additional_vouchers <- good %>%
+  subset(grepl('UW', indiv) | grepl('H-14', indiv))
+
+table(additional_vouchers$repunit)
 ```
 
 
@@ -296,8 +307,10 @@ mistakes <- ref_self %>%
   filter(scaled_likelihood > 0.80) %>%
   select(indiv, collection, inferred_collection, scaled_likelihood, z_score)
 
-```
 
+mistakes
+```
+Looks like the greenspot/greenblotched and pink/pinkrose/rosethorn aren't distinguishable with this panel
 
 ## other assignments
 ```{r other-assignments}
@@ -307,7 +320,6 @@ ref_self %>%
   filter(scaled_likelihood > 0.5 & scaled_likelihood < 0.95) %>%
   arrange(desc(scaled_likelihood))
 ```
-All 25 of the mis-assignments between 50-95% likelihood are gopher/black-and-yellow.
 
 
 ```{r}

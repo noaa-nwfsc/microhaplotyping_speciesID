@@ -1,6 +1,8 @@
 ---
 title: "unknown-species-id-template"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 June 2023
@@ -17,7 +19,7 @@ Using the rds file output from microhaplot:
 knitr::opts_knit$set(root.dir = "~/Desktop/RE_BS/stock review 2025 work/")
 ```
 
-```{r warning=FALSE}
+```{r warning=FALSE, include=FALSE}
 library(tidyverse)
 library(readxl)
 library(stringr)
@@ -25,6 +27,9 @@ library(lubridate)
 library(rubias)
 library(ggpattern)
 library(forcats)
+```
+
+```{r warning=FALSE}
 
 source("R/rockfish-funcs2.R")
 
@@ -98,7 +103,6 @@ genos_long_explicit_NAs %>%
   group_by(gtseq_run, id) %>%
   tally() 
 ```
-380 samples
 
 
 Look at missing data:
@@ -255,8 +259,8 @@ nonREBS <- top_assign %>%
   subset(repunit != 'melanostictus') %>%
   subset(repunit != 'aleutianus')
 
+table(nonREBS$repunit)
 
-top_assign
 df <- apply(top_assign,2,as.character)
 write.csv(df, file = '~/Desktop/RE_BS/stock review 2025 work/rubias_output_04_17_2025.csv')
 ```
