@@ -1,6 +1,8 @@
 ---
 title: "02-test-pca-w-unknowns"
-output: html_notebook
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 14 December 2022
@@ -17,6 +19,12 @@ I'll read in the baseline data and the unknown data, then filter both appropriat
 
 
 ```{r setup}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_knit$set(root.dir = '~/Desktop/RE_BS/stock review 2025 work/')
+
+```
+
+```{r libraries, message=FALSE, warning=FALSE, include=FALSE}
 library(tidyverse)
 library(adegenet)
 library(ape)
@@ -29,11 +37,7 @@ library(DescTools)
 library(factoextra)
 library(PNWColors)
 library(wesanderson)
-
-knitr::opts_knit$set(root.dir = '~/Desktop/RE_BS/stock review 2025 work/')
-
 ```
-
 
 
 ```{r load-data}
@@ -48,7 +52,7 @@ baseline_for_combo <- data %>%
 
 colnames(baseline_for_combo) <- c('id','locus','rank','haplo')
 
-baseline_for_combo 
+head(baseline_for_combo)
 ```
 
 
@@ -166,7 +170,7 @@ df_for_conversion <- long_df0s %>%
 df_for_conversion$STRATA <- as.factor(df_for_conversion$STRATA)
 
 # check on NAs here
-df_for_conversion
+head(df_for_conversion)
 ```
 
 
@@ -243,7 +247,7 @@ dev.off()
 ```
 
 
-```{r fst}
+```{r fst, message=FALSE, warning=FALSE}
 library(hierfstat)
 pal_species <- c('melanostictus male' = "#A6CEE3",
                  'melanostictus female' = "#1F78B4",
@@ -279,7 +283,6 @@ df <- tibble::rownames_to_column(PCA_df, "id")
 PCA_df_w_labels <- merge(df, rubias_calls, by.x = 'id', by.y = 'INDIVIDUALS')
 pca_info <- get_eigenvalue(dataset_pca1)
 
-pca
 
 PCA <- ggplot(data = (PCA_df_w_labels), aes(x = Axis1, y = Axis2, color = pop)) +
   geom_point(size = 2, alpha = 0.8) +

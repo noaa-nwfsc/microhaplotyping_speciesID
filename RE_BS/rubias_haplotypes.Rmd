@@ -1,6 +1,8 @@
 ---
 title: "unknown-species-id-template"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 June 2023
@@ -14,10 +16,11 @@ Using the rds file output from microhaplot:
 2. apply read depth filters
 3. apply allele balance filter
 ```{r setup}
+knitr::opts_chunk$set(warning = FALSE)
 knitr::opts_knit$set(root.dir = "~/Desktop/RE_BS/stock review 2025 work/")
 ```
 
-```{r warning=FALSE}
+```{r warning=FALSE, include=FALSE}
 library(tidyverse)
 library(readxl)
 library(stringr)
@@ -25,7 +28,9 @@ library(lubridate)
 library(rubias)
 library(ggpattern)
 library(forcats)
+```
 
+```{r}
 source("R/rockfish-funcs2.R")
 
 # get the names of the files
@@ -256,7 +261,8 @@ nonREBS <- top_assign %>%
   subset(repunit != 'aleutianus')
 
 
-top_assign
+table(top_assign$repunit)
+
 df <- apply(top_assign,2,as.character)
 write.csv(df, file = '~/Desktop/RE_BS/stock review 2025 work/rubias_output_04_17_2025.csv')
 ```
