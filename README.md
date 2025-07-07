@@ -7,8 +7,11 @@ Primary Contacts: Anita Wray,
 This project achieved two objectives:
 1. Find a sequencing panel to successfully ID rougheye from blackspotted rockfish for the 2025 stock assessment
 2. Test additional cryptic species complexes on existing sequencing panels.
-This repo doesn't include the other panels tested, but we were able to conclude that Diana's GTseq microhaplotyping panel works well. 
+This repo doesn't include the other panels tested, but we were able to conclude that Diana's GTseq microhaplotyping panel works well.
 
+This work has built off of two other existing repos:
+1. [Diana Baetscher's species ID GTseq panel & code](https://github.com/dbaetscher/rockfish-species-id)
+2. [Eric Anderson's microhaplotyping snakemake](https://github.com/eriqande/mega-simple-microhap-snakeflow)
 ## Methods:
 
 #### 1. Run snakemake to call microhaplotypes
@@ -19,10 +22,9 @@ Use Eric Anderson's snakemake to call microhaplotypes. See README within the SNA
 
 Use Rubias to test if known vouchered specimens can be identified to species using this panel
 
-
 #### 3. Run unknown samples
 
-Use Rubias to ID unknown samples. For reference, here are the species that we know can be identified using this panel.
+Use Rubias to ID unknown samples. For reference, the following are the species that can be identified using this panel.
 
 <img src="https://github.com/anitawray-NOAA/microhaplotyping_speciesID/blob/main/Screenshot%202025-07-03%20at%2012.41.58%20PM.png" width="400">
 
